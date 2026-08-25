@@ -353,24 +353,35 @@ section{padding-block:var(--section-y);padding-inline:var(--gutter)}
 .closing{
   position:relative;overflow:hidden;
   background:var(--creme);color:var(--blau);
-  min-height:clamp(30rem,78vh,44rem);
-  display:flex;align-items:center;justify-content:center;
-  text-align:center;padding-block:var(--sp-10);
+  min-height:clamp(38rem,108vh,62rem);
+  display:flex;align-items:flex-start;justify-content:center;
+  text-align:center;
+  padding-block:clamp(3rem,7vh,5rem) var(--sp-10);
 }
 .closing-bg{
   position:absolute;inset:0;z-index:0;
-  background-size:cover;background-position:50% 62%;background-repeat:no-repeat;
-  opacity:.34;
+  background-size:cover;background-position:50% 88%;background-repeat:no-repeat;
+  opacity:1;
 }
 .closing-bg::after{
   content:"";position:absolute;inset:0;
   background:
-    linear-gradient(to bottom, var(--creme) 0%, rgba(255,252,227,.6) 20%, rgba(255,252,227,.5) 55%, rgba(255,252,227,.85) 86%, var(--creme) 100%),
-    radial-gradient(ellipse 82% 66% at 50% 50%, rgba(255,252,227,.35) 0%, rgba(255,252,227,.82) 100%);
+    linear-gradient(to bottom, var(--creme) 0%, rgba(255,252,227,.82) 12%, rgba(255,252,227,.35) 28%, rgba(255,252,227,0) 44%, rgba(255,252,227,0) 86%, rgba(255,252,227,.45) 95%, var(--creme) 100%),
+    linear-gradient(to right, var(--creme) 0%, rgba(255,252,227,0) 12%, rgba(255,252,227,0) 88%, var(--creme) 100%);
 }
 .closing-inner{position:relative;z-index:1;max-width:34rem;padding-inline:var(--gutter)}
+.closing-inner::before{
+  content:"";position:absolute;z-index:-1;
+  left:50%;top:45%;transform:translate(-50%,-50%);
+  width:150%;height:210%;
+  background:radial-gradient(ellipse at center,
+    rgba(255,252,227,.96) 0%, rgba(255,252,227,.9) 40%,
+    rgba(255,252,227,.55) 68%, rgba(255,252,227,0) 100%);
+  pointer-events:none;
+}
 .vers{
-  font-family:var(--font-head);font-weight:400;font-style:italic;
+  font-family:var(--font-head);font-weight:500;font-style:italic;
+  text-shadow:0 1px 0 rgba(255,252,227,.8), 0 0 16px rgba(255,252,227,.65);
   font-size:clamp(1.25rem,.95rem + 1.45vw,2rem);
   line-height:1.5;letter-spacing:.005em;
   color:var(--blau);text-wrap:balance;
@@ -486,8 +497,8 @@ section{padding-block:var(--section-y);padding-inline:var(--gutter)}
   .btn{width:100%;padding:1rem 1rem}
 
   /* Abschluss */
-  .closing{min-height:auto;aspect-ratio:auto;padding-block:3.25rem;align-items:center}
-  .closing-bg{background-position:50% 58%;opacity:.34}
+  .closing{min-height:auto;aspect-ratio:3/4.4;padding-block:2.5rem 3rem;align-items:flex-start}
+  .closing-bg{background-position:50% 82%;opacity:1}
   .vers{font-size:1.15rem;line-height:1.55}
   .vers-quelle{font-size:.66rem;letter-spacing:.16em;margin-top:var(--sp-3)}
   .vers-rule{margin-bottom:var(--sp-4)}
@@ -826,8 +837,8 @@ section{padding-block:var(--section-y);padding-inline:var(--gutter)}
     document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
   }
 
-  /* ---- RSVP: geht an steven.froese@yahoo.de ---- */
-  const EMAIL='steven.froese@yahoo.de';
+  /* ---- RSVP: geht an sf@bv-capital.de ---- */
+  const EMAIL='sf@bv-capital.de';
   const KEY='rsvp_vicky_steven';
   const load=()=>{try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}};
   const save=d=>{try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}};
