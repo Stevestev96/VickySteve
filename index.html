@@ -839,122 +839,244 @@ section{padding-block:var(--section-y);padding-inline:var(--gutter)}
     document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
   }
 
-  /* ============================================================
+```html
+<!-- ============================================================
      RSVP-VERSAND
      ------------------------------------------------------------
-     PRIMÄR: Web3Forms  →  Schlüssel unten bei WEB3FORMS_KEY eintragen.
-             Kostenlos holen: https://web3forms.com  (E-Mail eingeben,
-             Schlüssel wird direkt angezeigt UND per Mail geschickt)
-     FALLBACK 1: Formsubmit
-     FALLBACK 2: Mailprogramm öffnen (mailto)
+     FormSubmit → sendet jede Rückmeldung an:
+       steven.froese@yahoo.de
+       vick.yhoffart2000@gmail.com
+
      Zusätzlich wird jede Rückmeldung lokal gespeichert.
-     ============================================================ */
-  const WEB3FORMS_KEY = 'HIER_DEINEN_KEY_EINFUEGEN';
-  const EMAIL = 'sf@bv-capital.de';
-  const KEY   = 'rsvp_vicky_steven';
+     ============================================================ -->
 
-  const load=()=>{try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}};
-  const save=d=>{try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}};
+<script>
+  const EMAILS = [
+    'steven.froese@yahoo.de',
+    'vick.yhoffart2000@gmail.com'
+  ];
 
-  const toastEl=document.getElementById('toast');
+  const KEY = 'rsvp_vicky_steven';
+
+  const load = () => {
+    try {
+      return JSON.parse(localStorage.getItem(KEY)) || [];
+    } catch (e) {
+      return [];
+    }
+  };
+
+  const save = d => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(d));
+    } catch (e) {}
+  };
+
+  const toastEl = document.getElementById('toast');
   let toastTimer;
-  function toast(msg,ms){
+
+  function toast(msg, ms) {
     clearTimeout(toastTimer);
-    toastEl.textContent=msg;
+    toastEl.textContent = msg;
     toastEl.classList.add('show');
-    toastTimer=setTimeout(()=>toastEl.classList.remove('show'),ms||3800);
+    toastTimer = setTimeout(
+      () => toastEl.classList.remove('show'),
+      ms || 3800
+    );
   }
 
-  function mailtoLink(e){
-    const subject='Rückmeldung Hochzeit Vicky & Steven · '+e.name;
-    const body=['Rückmeldung über die Hochzeitsseite','',
-      'Name: '+e.name,'Status: '+e.attending,
-      'Nachricht: '+(e.msg||'–'),'','Eingegangen: '+e.date].join('\n');
-    return 'mailto:'+EMAIL+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
-  }
+  /*
+   * FormSubmit-Versand
+   * Die Rückmeldung wird an beide E-Mail-Adressen geschickt.
+   */
+  async function sendFormsubmit(e) {
 
-  async function sendWeb3(e){
-    if(!WEB3FORMS_KEY || WEB3FORMS_KEY.indexOf('HIER_') === 0){
-      throw new Error('Web3Forms-Key fehlt');
-    }
-    const r = await fetch('https://api.web3forms.com/submit',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify({
-        access_key: WEB3FORMS_KEY,
-        subject: 'Rückmeldung Hochzeit · ' + e.name,
-        from_name: 'Hochzeitsseite Vicky & Steven',
-        'Name': e.name,
-        'Rückmeldung': e.attending,
-        'Nachricht': e.msg || '–',
-        'Eingegangen am': e.date
-      })
-    });
-    const data = await r.json().catch(()=>({}));
-    if(!r.ok || data.success === false){
-      throw new Error('Web3Forms: ' + (data.message || r.status));
-    }
-    return data;
-  }
+    const subject =
+      'Rückmeldung Hochzeit Vicky & Steven · ' + e.name;
 
-  async function sendFormsubmit(e){
-    const r=await fetch('https://formsubmit.co/ajax/'+EMAIL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify({
-        _subject:'Rückmeldung Hochzeit Vicky & Steven · '+e.name,
-        _template:'table',
-        Name:e.name, Status:e.attending,
-        Nachricht:e.msg||'–', Eingegangen_am:e.date
-      })
-    });
-    if(!r.ok)throw new Error('Formsubmit HTTP '+r.status);
-    return r.json();
-  }
+    const data = {
+      _subject: subject,
+      _template: 'table',
 
-  const btn=document.getElementById('submitBtn');
-  btn.addEventListener('click',async()=>{
-    const nameEl=document.getElementById('name');
-    const attEl=document.getElementById('attending');
-    const msgEl=document.getElementById('msg');
-    const name=nameEl.value.trim();
-    const attending=attEl.value;
+      Name: e.name,
+      Status: e.attending,
+      Nachricht: e.msg || '–',
+      Eingegangen_am: e.date
+    };
 
-    if(!name){toast('Bitte gib einen Namen ein.');nameEl.focus();return}
-    if(!attending){toast('Bitte wähle Zu- oder Absage.');attEl.focus();return}
+    /*
+     * Beide E-Mail-Adressen werden nacheinander angeschrieben.
+     */
+    for (const email of EMAILS) {
 
-    const entry={name,attending,msg:msgEl.value.trim(),date:new Date().toLocaleString('de-DE')};
-    const store=load(); store.push(entry); save(store);
+      const r = await fetch(
+        'https://formsubmit.co/ajax/' + email,
+        {
+          method: 'POST',
 
-    btn.disabled=true; btn.textContent='Wird gesendet …';
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
 
-    let versandt=false, weg='';
-    try{
-      await sendWeb3(entry); versandt=true; weg='web3forms';
-    }catch(err1){
-      console.warn('[RSVP] Web3Forms fehlgeschlagen:', err1.message);
-      try{
-        await sendFormsubmit(entry); versandt=true; weg='formsubmit';
-      }catch(err2){
-        console.warn('[RSVP] Formsubmit fehlgeschlagen:', err2.message);
+          body: JSON.stringify(data)
+        }
+      );
+
+      if (!r.ok) {
+        throw new Error(
+          'FormSubmit HTTP ' + r.status
+        );
+      }
+
+      const response = await r.json().catch(() => ({}));
+
+      if (response.success === false) {
+        throw new Error(
+          response.message || 'FormSubmit Fehler'
+        );
       }
     }
 
-    btn.disabled=false; btn.textContent='Absenden';
+    return true;
+  }
 
-    if(versandt){
-      console.log('[RSVP] gesendet via', weg);
-      nameEl.value=''; msgEl.value=''; attEl.value='';
-      toast(attending==='Ja'
-        ? 'Danke! Wir freuen uns riesig.'
-        : 'Schade, aber danke für die Rückmeldung.');
-    }else{
-      // Letzter Ausweg: Mailprogramm öffnen, Eingaben stehen lassen
-      toast('Wir öffnen kurz dein Mailprogramm – bitte die Mail dort absenden.', 6000);
-      setTimeout(()=>{ location.href = mailtoLink(entry); }, 900);
+  /*
+   * RSVP absenden
+   */
+  const btn = document.getElementById('submitBtn');
+
+  btn.addEventListener('click', async () => {
+
+    const nameEl = document.getElementById('name');
+    const attEl = document.getElementById('attending');
+    const msgEl = document.getElementById('msg');
+
+    const name = nameEl.value.trim();
+    const attending = attEl.value;
+
+    /*
+     * Validierung
+     */
+    if (!name) {
+      toast('Bitte gib einen Namen ein.');
+      nameEl.focus();
+      return;
     }
+
+    if (!attending) {
+      toast('Bitte wähle Zu- oder Absage.');
+      attEl.focus();
+      return;
+    }
+
+    /*
+     * RSVP-Daten
+     */
+    const entry = {
+      name: name,
+      attending: attending,
+      msg: msgEl.value.trim(),
+      date: new Date().toLocaleString('de-DE')
+    };
+
+    /*
+     * Lokal speichern
+     */
+    const store = load();
+    store.push(entry);
+    save(store);
+
+    /*
+     * Button deaktivieren
+     */
+    btn.disabled = true;
+    btn.textContent = 'Wird gesendet …';
+
+    let versandt = false;
+
+    /*
+     * FormSubmit
+     */
+    try {
+
+      await sendFormsubmit(entry);
+
+      versandt = true;
+
+      console.log(
+        '[RSVP] Erfolgreich an beide E-Mail-Adressen gesendet.'
+      );
+
+    } catch (err) {
+
+      console.warn(
+        '[RSVP] FormSubmit fehlgeschlagen:',
+        err.message
+      );
+    }
+
+    /*
+     * Button wieder aktivieren
+     */
+    btn.disabled = false;
+    btn.textContent = 'Absenden';
+
+    /*
+     * Erfolgreich
+     */
+    if (versandt) {
+
+      nameEl.value = '';
+      msgEl.value = '';
+      attEl.value = '';
+
+      toast(
+        attending === 'Ja'
+          ? 'Danke! Wir freuen uns riesig.'
+          : 'Schade, aber danke für die Rückmeldung.'
+      );
+
+    } else {
+
+      /*
+       * Falls FormSubmit nicht funktioniert,
+       * Mailprogramm als letzter Fallback öffnen.
+       */
+      const subject =
+        'Rückmeldung Hochzeit Vicky & Steven · ' + entry.name;
+
+      const body = [
+        'Rückmeldung über die Hochzeitsseite',
+        '',
+        'Name: ' + entry.name,
+        'Status: ' + entry.attending,
+        'Nachricht: ' + (entry.msg || '–'),
+        '',
+        'Eingegangen: ' + entry.date
+      ].join('\n');
+
+      toast(
+        'Die Übermittlung ist fehlgeschlagen. Bitte versuche es erneut.',
+        6000
+      );
+
+      /*
+       * Optionaler Mail-Fallback an Steven
+       */
+      setTimeout(() => {
+
+        location.href =
+          'mailto:steven.froese@yahoo.de' +
+          '?subject=' +
+          encodeURIComponent(subject) +
+          '&body=' +
+          encodeURIComponent(body);
+
+      }, 900);
+    }
+
   });
-})();
 </script>
-</body>
-</html>
+```
+
