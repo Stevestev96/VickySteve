@@ -769,6 +769,10 @@ section{padding-block:var(--section-y);padding-inline:var(--gutter)}
         <label for="msg">Nachricht an uns (optional)</label>
         <textarea id="msg" name="msg" placeholder="Songwunsch, Hotel-Frage, ein paar liebe Worte …"></textarea>
       </div>
+      <div class="f" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;overflow:hidden">
+        <label for="website">Website</label>
+        <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+      </div>
       <button class="btn" id="submitBtn" type="button">Absenden</button>
     </div>
   </div>
@@ -850,7 +854,15 @@ section{padding-block:var(--section-y);padding-inline:var(--gutter)}
      Zusätzlich wird jede Rückmeldung lokal gespeichert.
      ============================================================ */
   const WEB3FORMS_KEY = 'HIER_DEINEN_KEY_EINFUEGEN';
-  const EMAIL = 'sf@bv-capital.de';
+
+  /* Empfänger der Benachrichtigung.
+     WICHTIG: Web3Forms schickt immer an die Adresse, mit der der Access Key
+     erstellt wurde. Damit die Yahoo-Adresse zuverlässig etwas bekommt, muss der
+     Key mit Steven.froese@yahoo.de erzeugt werden (ccemail unten ist PRO-only). */
+  const EMAIL    = 'Steven.froese@yahoo.de';   // Hauptempfänger
+  const EMAIL_CC = 'sf@bv-capital.de';         // zusätzlich in Kopie
+  const EMPFAENGER = [EMAIL, EMAIL_CC];
+
   const KEY   = 'rsvp_vicky_steven';
 
   const load=()=>{try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}};
@@ -870,7 +882,29 @@ section{padding-block:var(--section-y);padding-inline:var(--gutter)}
     const body=['Rückmeldung über die Hochzeitsseite','',
       'Name: '+e.name,'Status: '+e.attending,
       'Nachricht: '+(e.msg||'–'),'','Eingegangen: '+e.date].join('\n');
-    return 'mailto:'+EMAIL+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+    return 'mailto:'+EMAIL+'?cc='+encodeURIComponent(EMAIL_CC)
+      +'&subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  }
+
+  /* PRIMÄR: eigener Endpoint auf Vercel → legt ein GitHub-Issue an. */
+  const RSVP_ENDPOINT = '/api/rsvp';
+
+  async function sendVercel(e){
+    const r = await fetch(RSVP_ENDPOINT,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({
+        name: e.name,
+        attending: e.attending,
+        msg: e.msg || '',
+        website: e.website || ''
+      })
+    });
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok || data.ok !== true){
+      throw new Error('Endpoint: ' + (data.fehler || r.status));
+    }
+    return data;
   }
 
   async function sendWeb3(e){
@@ -882,8 +916,9 @@ section{padding-block:var(--section-y);padding-inline:var(--gutter)}
       headers:{'Content-Type':'application/json','Accept':'application/json'},
       body:JSON.stringify({
         access_key: WEB3FORMS_KEY,
-        subject: 'Rückmeldung Hochzeit · ' + e.name,
+        subject: 'Rückmeldung Hochzeit · ' + e.name + ' · ' + e.attending,
         from_name: 'Hochzeitsseite Vicky & Steven',
+        ccemail: EMAIL_CC,
         'Name': e.name,
         'Rückmeldung': e.attending,
         'Nachricht': e.msg || '–',
@@ -897,19 +932,35 @@ section{padding-block:var(--section-y);padding-inline:var(--gutter)}
     return data;
   }
 
-  async function sendFormsubmit(e){
-    const r=await fetch('https://formsubmit.co/ajax/'+EMAIL,{
+  async function sendFormsubmitAn(adresse,e){
+    const r=await fetch('https://formsubmit.co/ajax/'+encodeURIComponent(adresse),{
       method:'POST',
       headers:{'Content-Type':'application/json','Accept':'application/json'},
       body:JSON.stringify({
-        _subject:'Rückmeldung Hochzeit Vicky & Steven · '+e.name,
+        _subject:'Rückmeldung Hochzeit Vicky & Steven · '+e.name+' · '+e.attending,
         _template:'table',
         Name:e.name, Status:e.attending,
         Nachricht:e.msg||'–', Eingegangen_am:e.date
       })
     });
-    if(!r.ok)throw new Error('Formsubmit HTTP '+r.status);
+    if(!r.ok)throw new Error('Formsubmit HTTP '+r.status+' ('+adresse+')');
     return r.json();
+  }
+
+  /* An alle Empfänger parallel. Erfolg, sobald mindestens eine Mail rausgeht. */
+  async function sendFormsubmit(e){
+    const ergebnisse = await Promise.allSettled(
+      EMPFAENGER.map(adresse => sendFormsubmitAn(adresse,e))
+    );
+    ergebnisse.forEach((res,i)=>{
+      if(res.status==='rejected'){
+        console.warn('[RSVP] Formsubmit an '+EMPFAENGER[i]+' fehlgeschlagen:', res.reason && res.reason.message);
+      }
+    });
+    if(!ergebnisse.some(res=>res.status==='fulfilled')){
+      throw new Error('Formsubmit: kein Empfänger erreicht');
+    }
+    return ergebnisse;
   }
 
   const btn=document.getElementById('submitBtn');
@@ -923,20 +974,27 @@ section{padding-block:var(--section-y);padding-inline:var(--gutter)}
     if(!name){toast('Bitte gib einen Namen ein.');nameEl.focus();return}
     if(!attending){toast('Bitte wähle Zu- oder Absage.');attEl.focus();return}
 
-    const entry={name,attending,msg:msgEl.value.trim(),date:new Date().toLocaleString('de-DE')};
+    const entry={name,attending,msg:msgEl.value.trim(),
+      website:document.getElementById('website').value.trim(),
+      date:new Date().toLocaleString('de-DE')};
     const store=load(); store.push(entry); save(store);
 
     btn.disabled=true; btn.textContent='Wird gesendet …';
 
     let versandt=false, weg='';
     try{
-      await sendWeb3(entry); versandt=true; weg='web3forms';
-    }catch(err1){
-      console.warn('[RSVP] Web3Forms fehlgeschlagen:', err1.message);
+      await sendVercel(entry); versandt=true; weg='endpoint';
+    }catch(err0){
+      console.warn('[RSVP] Endpoint fehlgeschlagen:', err0.message);
       try{
-        await sendFormsubmit(entry); versandt=true; weg='formsubmit';
-      }catch(err2){
-        console.warn('[RSVP] Formsubmit fehlgeschlagen:', err2.message);
+        await sendWeb3(entry); versandt=true; weg='web3forms';
+      }catch(err1){
+        console.warn('[RSVP] Web3Forms fehlgeschlagen:', err1.message);
+        try{
+          await sendFormsubmit(entry); versandt=true; weg='formsubmit';
+        }catch(err2){
+          console.warn('[RSVP] Formsubmit fehlgeschlagen:', err2.message);
+        }
       }
     }
 
